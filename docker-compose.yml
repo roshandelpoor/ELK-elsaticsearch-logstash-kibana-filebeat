@@ -2,6 +2,14 @@ version: '3.7'
 
 services:
 
+  redis:
+    image: redis:alpine
+    restart: "no"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:${ELK_VERSION}
     environment:
@@ -27,12 +35,21 @@ services:
     depends_on:
       - elasticsearch
 
-  logstash:
+  # We have a Logstash “agent”, which acts like a logs buffer.
+  logstash-agent:
     image: docker.elastic.co/logstash/logstash:${ELK_VERSION}
     volumes:
-      - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+      - ./logstash/logstash_agent.conf:/usr/share/logstash/pipeline/logstash_agent.conf
     ports:
       - "5044:5044"
+    depends_on:
+      - elasticsearch
+
+  # We have a Logstash “central” Logstash container reads logs from the Redis buffer and shoves them into Elasticsearch.
+  logstash-central:
+    image: docker.elastic.co/logstash/logstash:${ELK_VERSION}
+    volumes:
+      - ./logstash/logstash_center.conf:/usr/share/logstash/pipeline/logstash_center.conf
     depends_on:
       - elasticsearch
 
@@ -45,29 +62,8 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      - logstash
-
-  #  # laravel without nginx (with artisan serve)
-  #  laravel:
-  #    build: ./
-  #    container_name: laravel_app
-  #    working_dir: /var/www/html
-  #    volumes:
-  #      - ./laravel:/var/www/html
-  #    command: >
-  #      sh -c "composer install &&
-  #             php artisan serve --host=0.0.0.0 --port=8000"
-  #    ports:
-  #      - "8000:8000"
-  #    depends_on:
-  #      - filebeat
-  #    environment:
-  #      - COMPOSER_ALLOW_SUPERUSER=1
-  #    logging:
-  #      driver: "json-file"
-  #      options:
-  #        max-size: "10m"
-  #        max-file: "5"
+      - logstash-agent
+      - logstash-central
 
   # laravel with nginx
   laravel:
@@ -111,6 +107,28 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+
+  #  # laravel without nginx (with artisan serve)
+  #  laravel:
+  #    build: ./
+  #    container_name: laravel_app
+  #    working_dir: /var/www/html
+  #    volumes:
+  #      - ./laravel:/var/www/html
+  #    command: >
+  #      sh -c "composer install &&
+  #             php artisan serve --host=0.0.0.0 --port=8000"
+  #    ports:
+  #      - "8000:8000"
+  #    depends_on:
+  #      - filebeat
+  #    environment:
+  #      - COMPOSER_ALLOW_SUPERUSER=1
+  #    logging:
+  #      driver: "json-file"
+  #      options:
+  #        max-size: "10m"
+  #        max-file: "5"
 
 volumes:
   esdata:

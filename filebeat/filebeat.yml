@@ -11,7 +11,7 @@ filebeat.inputs:
       - '*'
 
 output.logstash:
-  hosts: ["logstash:5044"]
+  hosts: ["logstash-agent:5044"]
 
 logging.level: debug
 logging.to_stderr: true
