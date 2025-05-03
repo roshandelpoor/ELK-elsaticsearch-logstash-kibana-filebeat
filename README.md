@@ -31,7 +31,7 @@ The logging pipeline works as follows:
 
 1. Create a `.env` file with the following variable:
    ```
-   ELK_VERSION=8.12.0
+   ELK_VERSION=8.13.4
    ```
 
 2. The project uses the following ports:
